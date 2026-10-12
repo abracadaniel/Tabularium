@@ -72,6 +72,15 @@ jobs:
   duckdb:
     name: DuckDB (opt-in feature)
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # The bundled DuckDB engine (with json and parquet) is large: without debug info and
+    # with fewer parallel C++ compiles the build fits the runner's disk and memory.
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_BUILD_JOBS: "2"
+      NUM_JOBS: "2"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
