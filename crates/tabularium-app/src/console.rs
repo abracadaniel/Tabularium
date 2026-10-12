@@ -102,6 +102,8 @@ pub struct ConsoleTab {
     results_height: f32,
     close_prompt: bool,
     force_close: bool,
+    /// Runtime handle, kept so the session can be closed when the tab closes.
+    rt: Option<tokio::runtime::Handle>,
 }
 
 impl ConsoleTab {
@@ -142,6 +144,7 @@ impl ConsoleTab {
             results_height: 260.0,
             close_prompt: false,
             force_close: false,
+            rt: None,
         }
     }
 
@@ -1079,6 +1082,9 @@ impl TabView for ConsoleTab {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, ctx: &mut Ctx) {
+        if self.rt.is_none() {
+            self.rt = Some(ctx.rt.clone());
+        }
         self.poll_tasks(ctx);
         // Keep the console's session config in sync with the data source.
         if let Some(ds) = ctx.sources.get(self.ds) {
@@ -1129,13 +1135,11 @@ impl TabView for ConsoleTab {
 
     fn can_close(&mut self) -> bool {
         if self.force_close || !self.in_transaction {
-            let s = self.session.clone();
-            // Closing the session is fire-and-forget.
-            std::thread::spawn(move || {
-                if let Ok(rt) = tokio::runtime::Builder::new_current_thread().enable_all().build() {
-                    rt.block_on(s.disconnect());
-                }
-            });
+            // Close the session on the runtime that owns its socket (fire-and-forget).
+            if let Some(rt) = &self.rt {
+                let s = self.session.clone();
+                rt.spawn(async move { s.disconnect().await });
+            }
             return true;
         }
         self.close_prompt = true;
