@@ -249,9 +249,9 @@ impl TableDesignerTab {
                             swap = Some((i, i + 1));
                         }
                     });
-                    ui.add(egui::TextEdit::singleline(&mut r.col.name).desired_width(140.0));
+                    ui.add_sized([140.0, 20.0], egui::TextEdit::singleline(&mut r.col.name));
                     ui.horizontal(|ui| {
-                        ui.add(egui::TextEdit::singleline(&mut r.col.data_type).desired_width(130.0).font(egui::TextStyle::Monospace));
+                        ui.add_sized([130.0, 20.0], egui::TextEdit::singleline(&mut r.col.data_type).font(egui::TextStyle::Monospace));
                         egui::ComboBox::from_id_salt(("type", i)).width(18.0).selected_text("").show_ui(ui, |ui| {
                             for t in types {
                                 if ui.selectable_label(r.col.data_type == *t, *t).clicked() {
@@ -269,11 +269,11 @@ impl TableDesignerTab {
                     }
                     ui.checkbox(&mut r.col.auto_increment, "");
                     let mut def = r.col.default.clone().unwrap_or_default();
-                    if ui.add(egui::TextEdit::singleline(&mut def).desired_width(120.0).font(egui::TextStyle::Monospace)).changed() {
+                    if ui.add_sized([120.0, 20.0], egui::TextEdit::singleline(&mut def).font(egui::TextStyle::Monospace)).changed() {
                         r.col.default = if def.trim().is_empty() { None } else { Some(def) };
                     }
                     let mut cm = r.col.comment.clone().unwrap_or_default();
-                    if ui.add(egui::TextEdit::singleline(&mut cm).desired_width(160.0)).changed() {
+                    if ui.add_sized([160.0, 20.0], egui::TextEdit::singleline(&mut cm)).changed() {
                         r.col.comment = if cm.trim().is_empty() { None } else { Some(cm) };
                     }
                     if ui.small_button("×").on_hover_text("Remove column").clicked() {
@@ -307,8 +307,8 @@ impl TableDesignerTab {
             }
             ui.end_row();
             for (i, (name, cols, unique)) in self.indexes.iter_mut().enumerate() {
-                ui.add(egui::TextEdit::singleline(name).desired_width(180.0));
-                ui.add(egui::TextEdit::singleline(cols).desired_width(260.0));
+                ui.add_sized([180.0, 20.0], egui::TextEdit::singleline(name));
+                ui.add_sized([260.0, 20.0], egui::TextEdit::singleline(cols));
                 ui.checkbox(unique, "");
                 if ui.small_button("×").clicked() {
                     remove = Some(i);
@@ -334,12 +334,12 @@ impl TableDesignerTab {
             ui.end_row();
             for (i, (fk, (cols, refs))) in self.fks.iter_mut().zip(self.fk_columns_text.iter_mut()).enumerate() {
                 let mut name = fk.name.clone().unwrap_or_default();
-                if ui.add(egui::TextEdit::singleline(&mut name).desired_width(140.0)).changed() {
+                if ui.add_sized([140.0, 20.0], egui::TextEdit::singleline(&mut name)).changed() {
                     fk.name = if name.is_empty() { None } else { Some(name) };
                 }
-                ui.add(egui::TextEdit::singleline(cols).desired_width(120.0));
+                ui.add_sized([120.0, 20.0], egui::TextEdit::singleline(cols));
                 ui.horizontal(|ui| {
-                    ui.add(egui::TextEdit::singleline(&mut fk.ref_table).desired_width(120.0));
+                    ui.add_sized([120.0, 20.0], egui::TextEdit::singleline(&mut fk.ref_table));
                     egui::ComboBox::from_id_salt(("fk_table", i)).width(18.0).selected_text("").show_ui(ui, |ui| {
                         for t in tables {
                             if ui.selectable_label(&fk.ref_table == t, t).clicked() {
@@ -348,7 +348,7 @@ impl TableDesignerTab {
                         }
                     });
                 });
-                ui.add(egui::TextEdit::singleline(refs).desired_width(120.0));
+                ui.add_sized([120.0, 20.0], egui::TextEdit::singleline(refs));
                 for (j, action) in [&mut fk.on_delete, &mut fk.on_update].into_iter().enumerate() {
                     egui::ComboBox::from_id_salt(("fk_act", i, j)).width(90.0).selected_text(action.sql()).show_ui(ui, |ui| {
                         for a in [FkAction::NoAction, FkAction::Restrict, FkAction::Cascade, FkAction::SetNull, FkAction::SetDefault] {
@@ -381,10 +381,10 @@ impl TableDesignerTab {
             ui.end_row();
             for (i, c) in self.checks.iter_mut().enumerate() {
                 let mut name = c.name.clone().unwrap_or_default();
-                if ui.add(egui::TextEdit::singleline(&mut name).desired_width(160.0)).changed() {
+                if ui.add_sized([160.0, 20.0], egui::TextEdit::singleline(&mut name)).changed() {
                     c.name = if name.is_empty() { None } else { Some(name) };
                 }
-                ui.add(egui::TextEdit::singleline(&mut c.expression).desired_width(360.0).font(egui::TextStyle::Monospace));
+                ui.add_sized([360.0, 20.0], egui::TextEdit::singleline(&mut c.expression).font(egui::TextStyle::Monospace));
                 if ui.small_button("×").clicked() {
                     remove = Some(i);
                 }
@@ -449,12 +449,12 @@ impl TabView for TableDesignerTab {
             .unwrap_or_default();
         ui.horizontal(|ui| {
             ui.label("Table:");
-            ui.add(egui::TextEdit::singleline(&mut self.name).desired_width(200.0));
+            ui.add_sized([200.0, 20.0], egui::TextEdit::singleline(&mut self.name));
             if let Some(s) = &self.schema {
                 ui.weak(format!("in schema {s}"));
             }
             ui.label("Comment:");
-            ui.add(egui::TextEdit::singleline(&mut self.comment).desired_width(260.0));
+            ui.add_sized([260.0, 20.0], egui::TextEdit::singleline(&mut self.comment));
             if self.load.is_some() {
                 ui.spinner();
             }

@@ -568,11 +568,14 @@ impl TabulariumApp {
         }
         let Ok(data) = std::fs::read_to_string(self.consoles_file()) else { return };
         let Ok(saved) = serde_json::from_str::<Vec<Saved>>(&data) else { return };
-        for (n, s) in saved.into_iter().enumerate() {
+        let mut per_source: std::collections::HashMap<Uuid, usize> = Default::default();
+        for s in saved {
             let Some(source) = self.sources.get(s.ds) else { continue };
             let cfg = source.config.clone();
             let id = self.next_id();
-            let mut tab = ConsoleTab::new(id, s.ds, &cfg.name.clone(), cfg, s.text.clone(), n + 1);
+            let ordinal = per_source.entry(s.ds).or_default();
+            *ordinal += 1;
+            let mut tab = ConsoleTab::new(id, s.ds, &cfg.name.clone(), cfg, s.text.clone(), *ordinal);
             if let Some(f) = s.file {
                 // Keep unsaved edits but remember the file's saved contents for the dirty marker.
                 let on_disk = std::fs::read_to_string(&f).unwrap_or_default();
