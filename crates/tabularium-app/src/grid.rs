@@ -70,6 +70,8 @@ pub struct ResultGrid {
     pub max_cell_chars: usize,
     pub font_size: f32,
     widths: Vec<f32>,
+    grow_widths: bool,
+    width_generation: u64,
     scroll_to: Option<usize>,
 }
 
@@ -103,6 +105,8 @@ impl ResultGrid {
             max_cell_chars: 200,
             font_size: 12.5,
             widths: vec![],
+            grow_widths: false,
+            width_generation: 0,
             scroll_to: None,
         };
         g.set_data(columns, rows);
@@ -119,7 +123,10 @@ impl ResultGrid {
         self.deleted.clear();
         self.inserted.clear();
         self.editing = None;
-        if !same_columns {
+        if same_columns {
+            // Widen (never shrink) columns whose new content is longer.
+            self.grow_widths = true;
+        } else {
             self.widths.clear();
             self.sort = None;
             self.anchor = None;
@@ -485,7 +492,7 @@ impl ResultGrid {
                     self.rebuild_order();
                 }
                 ui.weak(format!("{} of {} rows", self.order.len(), self.rows.len()));
-                if ui.small_button("✕").clicked() {
+                if ui.small_button("×").clicked() {
                     self.search.clear();
                     self.search_open = false;
                     self.rebuild_order();
@@ -623,7 +630,22 @@ impl ResultGrid {
         let row_height = ui.fonts_mut(|f| f.row_height(&font)) + 6.0;
         if self.widths.len() != self.columns.len() {
             self.widths = self.initial_widths(ui, &font);
+        } else if self.grow_widths {
+            let fresh = self.initial_widths(ui, &font);
+            let mut grew = false;
+            for (w, f) in self.widths.iter_mut().zip(fresh) {
+                if f > *w + 1.0 {
+                    *w = f;
+                    grew = true;
+                }
+            }
+            // egui_extras keeps column widths under the table id once shown; a new id makes it
+            // adopt the wider initial widths (only then, so manual resizes survive reloads).
+            if grew {
+                self.width_generation += 1;
+            }
         }
+        self.grow_widths = false;
         let n = self.order.len();
         let row_num_width = ((n + self.row_offset).max(1).to_string().len() as f32 * self.font_size * 0.62 + 16.0).max(36.0);
         let mut header_clicked: Option<usize> = None;
@@ -634,7 +656,7 @@ impl ResultGrid {
 
         egui::ScrollArea::horizontal().id_salt(self.id.with("hscroll")).auto_shrink([false, false]).show(ui, |ui| {
             let mut tb = TableBuilder::new(ui)
-                .id_salt(self.id.with("table"))
+                .id_salt(self.id.with(("table", self.width_generation)))
                 .striped(true)
                 .resizable(true)
                 .auto_shrink([false, false])
@@ -997,7 +1019,7 @@ impl ResultGrid {
         ui.horizontal(|ui| {
             ui.strong("Value");
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.small_button("✕").clicked() {
+                if ui.small_button("×").clicked() {
                     self.show_value_viewer = false;
                 }
             });

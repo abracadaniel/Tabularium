@@ -234,10 +234,10 @@ impl TableDataTab {
             }
             ui.separator();
             if self.grid.editable {
-                if ui.button("＋").on_hover_text("Add row (Insert)").clicked() {
+                if ui.button("+").on_hover_text("Add row (Insert)").clicked() {
                     self.grid.add_row();
                 }
-                if ui.button("－").on_hover_text("Delete selected rows (Ctrl+Delete)").clicked() {
+                if ui.button("-").on_hover_text("Delete selected rows (Ctrl+Delete)").clicked() {
                     self.grid.delete_selected_rows();
                 }
                 let pending = self.grid.has_pending_changes();

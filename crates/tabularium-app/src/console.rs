@@ -29,6 +29,13 @@ enum ExecEvent {
     Finished { in_transaction: bool },
 }
 
+/// Databases, schemas, current database, current schema.
+type Navigation = (Vec<String>, Vec<String>, Option<String>, Option<String>);
+
+/// Statements with their byte offset in the editor.
+type Statements = Vec<(String, usize)>;
+
+#[allow(clippy::large_enum_variant)]
 enum ResultView {
     Grid {
         grid: Box<ResultGrid>,
@@ -81,7 +88,7 @@ pub struct ConsoleTab {
     schemas: Vec<String>,
     current_db: Option<String>,
     current_schema: Option<String>,
-    nav_loading: Option<Pending<Result<(Vec<String>, Vec<String>, Option<String>, Option<String>), Error>>>,
+    nav_loading: Option<Pending<Result<Navigation, Error>>>,
     nav_loaded: bool,
     switch_task: Option<Pending<Result<(), Error>>>,
     describe_tasks: Vec<Pending<Option<TableInfo>>>,
@@ -200,7 +207,7 @@ impl ConsoleTab {
         }
         if !names.is_empty() {
             let values: Vec<String> = names.iter().map(|n| self.param_values.get(n).cloned().unwrap_or_default()).collect();
-            let quote = values.iter().map(|v| v.parse::<f64>().is_err() && v.to_ascii_uppercase() != "NULL").collect();
+            let quote = values.iter().map(|v| v.parse::<f64>().is_err() && !v.eq_ignore_ascii_case("NULL")).collect();
             self.params = Some(ParamPrompt { statements, names, values, quote, explain });
             return;
         }
@@ -787,10 +794,10 @@ impl ConsoleTab {
                     ui.weak(summary.as_str());
                     ui.separator();
                     if grid.editable && table.is_some() {
-                        if ui.small_button("＋").on_hover_text("Add row").clicked() {
+                        if ui.small_button("+").on_hover_text("Add row").clicked() {
                             grid.add_row();
                         }
-                        if ui.small_button("－").on_hover_text("Delete selected rows").clicked() {
+                        if ui.small_button("-").on_hover_text("Delete selected rows").clicked() {
                             grid.delete_selected_rows();
                         }
                         let pending = grid.has_pending_changes();
@@ -869,7 +876,7 @@ impl ConsoleTab {
     }
 
     fn dialogs(&mut self, ui: &mut egui::Ui, ctx: &mut Ctx) {
-        let mut run_with: Option<(Vec<(String, usize)>, Option<bool>)> = None;
+        let mut run_with: Option<(Statements, Option<bool>)> = None;
         if let Some(p) = &mut self.params {
             let mut open = true;
             let mut go = false;

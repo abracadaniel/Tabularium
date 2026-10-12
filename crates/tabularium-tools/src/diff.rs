@@ -598,7 +598,25 @@ fn retarget_table(t: &TableInfo, schema: Option<&str>) -> TableInfo {
     let from = t.object.schema.clone();
     t.object = retarget(&t.object, schema);
     t.foreign_keys = t.foreign_keys.iter().map(|fk| retarget_fk(fk, from.as_deref(), schema)).collect();
+    t.columns = t.columns.iter().map(portable_column).collect();
     t
+}
+
+/// Sequence-backed auto-increment columns (`DEFAULT nextval('src.seq')`) would keep
+/// referencing the source database's sequence; express them as identity/auto-increment
+/// instead so the target gets its own.
+fn portable_column(c: &ColumnInfo) -> ColumnInfo {
+    let mut c = c.clone();
+    if c.auto_increment && crate::util::is_nextval(c.default.as_deref()) {
+        c.default = None;
+        c.data_type = match c.data_type.to_ascii_lowercase().as_str() {
+            "serial" | "serial4" => "integer".into(),
+            "bigserial" | "serial8" => "bigint".into(),
+            "smallserial" | "serial2" => "smallint".into(),
+            _ => c.data_type,
+        };
+    }
+    c
 }
 
 /// Ordered migration statements (bare, without terminators) for `diff`:
@@ -658,6 +676,10 @@ pub fn migration_script(diff: &SchemaDiff, dialect: Dialect, target_schema: Opti
                     .map(|tc| match tc {
                         TableChange::AddForeignKey(fk) => {
                             TableChange::AddForeignKey(retarget_fk(fk, name.schema.as_deref(), schema))
+                        }
+                        TableChange::AddColumn(c) => TableChange::AddColumn(portable_column(c)),
+                        TableChange::AlterColumn { old, new } => {
+                            TableChange::AlterColumn { old: old.clone(), new: portable_column(new) }
                         }
                         other => other.clone(),
                     })

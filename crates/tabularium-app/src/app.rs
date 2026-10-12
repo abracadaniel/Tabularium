@@ -18,6 +18,9 @@ use crate::settings::Settings;
 use crate::text_view::TextTab;
 use crate::theme::{self, Palette};
 
+/// Work finished in the background that updates the app on the UI thread.
+type AppCallback = Box<dyn FnOnce(&mut TabulariumApp) + Send>;
+
 struct Tab {
     id: u64,
     view: Box<dyn TabView>,
@@ -67,7 +70,7 @@ pub struct TabulariumApp {
     dialogs: Vec<Box<dyn Dialog>>,
     settings_dialog: Option<crate::settings_dialog::SettingsDialog>,
     goto: Option<crate::goto::GotoDialog>,
-    background: Vec<Pending<Box<dyn FnOnce(&mut TabulariumApp) + Send>>>,
+    background: Vec<Pending<AppCallback>>,
     show_explorer: bool,
     show_about: bool,
     exiting: bool,
@@ -883,7 +886,7 @@ impl TabulariumApp {
                                         ui.close();
                                     }
                                 });
-                                if ui.add(egui::Button::new(egui::RichText::new("✕").small()).frame(false)).clicked() {
+                                if ui.add(egui::Button::new(egui::RichText::new("×").small()).frame(false)).clicked() {
                                     close = Some(i);
                                 }
                             });
@@ -953,7 +956,7 @@ impl TabulariumApp {
                         ui.horizontal(|ui| {
                             ui.colored_label(color, "●");
                             ui.add(egui::Label::new(&n.text).wrap());
-                            if ui.small_button("✕").clicked() {
+                            if ui.small_button("×").clicked() {
                                 dismiss = Some(i);
                             }
                         });
@@ -1162,7 +1165,7 @@ impl TabulariumApp {
             if ui.button("📂 Open SQL file").clicked() {
                 self.pick_and_open_file();
             }
-            if ui.button("🪶 Open SQLite database").clicked() {
+            if ui.button("💾 Open SQLite database").clicked() {
                 if let Some(p) = rfd::FileDialog::new().add_filter("SQLite", &["db", "sqlite", "sqlite3", "db3"]).pick_file() {
                     let cfg = ConnectionConfig::sqlite(p.to_string_lossy());
                     let id = cfg.id;

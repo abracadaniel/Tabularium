@@ -12,13 +12,16 @@ use crate::ctx::{AppAction, Ctx, TabView};
 use crate::runtime::{poll_slot, Pending};
 use crate::theme::Palette;
 
+/// Schemas of a data source and its current schema.
+type SchemaList = (Vec<String>, Option<String>);
+
 #[derive(Default)]
 struct Side {
     ds: Option<Uuid>,
     schema: Option<String>,
     schemas: Vec<String>,
     schemas_for: Option<Uuid>,
-    loading_schemas: Option<Pending<Result<(Vec<String>, Option<String>), Error>>>,
+    loading_schemas: Option<Pending<Result<SchemaList, Error>>>,
 }
 
 pub struct SchemaCompareTab {
@@ -51,12 +54,10 @@ impl SchemaCompareTab {
     }
 
     fn side_ui(ui: &mut egui::Ui, ctx: &mut Ctx, side: &mut Side, label: &str, id: &str) {
-        if let Some(r) = poll_slot(&mut side.loading_schemas) {
-            if let Ok((schemas, current)) = r {
-                side.schemas = schemas;
-                if side.schema.is_none() {
-                    side.schema = current.or_else(|| side.schemas.first().cloned());
-                }
+        if let Some(Ok((schemas, current))) = poll_slot(&mut side.loading_schemas) {
+            side.schemas = schemas;
+            if side.schema.is_none() {
+                side.schema = current.or_else(|| side.schemas.first().cloned());
             }
         }
         if side.ds.is_some() && side.schemas_for != side.ds {

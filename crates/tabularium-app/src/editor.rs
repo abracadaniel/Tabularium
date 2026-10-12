@@ -281,6 +281,8 @@ impl CodeEditor {
             galley
         };
 
+        // The text area fills the pane so clicking below the last line focuses the editor.
+        let fill_height = ui.available_height();
         let line_count = self.text.split('\n').count().max(1);
         let row_height = ui.fonts_mut(|f| f.row_height(&font_id));
         let output = egui::ScrollArea::both()
@@ -342,6 +344,7 @@ impl CodeEditor {
                             .lock_focus(true)
                             .desired_width(f32::INFINITY)
                             .desired_rows(8)
+                            .min_size(egui::vec2(0.0, fill_height - 4.0))
                             .frame(false)
                             .layouter(&mut layouter)
                             .show(ui)
@@ -450,7 +453,11 @@ impl CodeEditor {
                     .show(ui.ctx(), |ui| {
                         egui::Frame::popup(ui.style()).show(ui, |ui| {
                             ui.set_min_width(260.0);
-                            egui::ScrollArea::vertical().max_height(260.0).show(ui, |ui| {
+                            // Size from the item count: the Area otherwise remembers the height
+                            // of a previous, shorter list.
+                            let row_h = ui.spacing().interact_size.y + ui.spacing().item_spacing.y;
+                            let wanted = (state.completion.items.len() as f32 * row_h).min(260.0);
+                            egui::ScrollArea::vertical().max_height(260.0).min_scrolled_height(wanted).show(ui, |ui| {
                                 for (i, item) in state.completion.items.iter().enumerate() {
                                     let selected = i == state.selected;
                                     let r = ui.horizontal(|ui| {
@@ -668,7 +675,7 @@ impl CodeEditor {
                 }
                 *self.layout_cache.borrow_mut() = None;
             }
-            if ui.small_button("✕").clicked() || ui.input(|i| i.key_pressed(Key::Escape)) {
+            if ui.small_button("×").clicked() || ui.input(|i| i.key_pressed(Key::Escape)) {
                 close = true;
             }
         });

@@ -172,7 +172,7 @@ impl Explorer {
         self.poll(ctx);
         let palette = Palette::current(ui.ctx());
         ui.horizontal(|ui| {
-            ui.menu_button("＋", |ui| {
+            ui.menu_button("+", |ui| {
                 for kind in DriverKind::ALL {
                     if ui.button(kind.label()).clicked() {
                         ctx.act(AppAction::NewDataSource(kind));
@@ -531,7 +531,7 @@ impl Explorer {
                 ui.weak(if filter.is_empty() { "empty" } else { "no matches" });
             }
             for (kind, mut list) in by_kind {
-                list.sort_by(|a, b| a.object.name.to_lowercase().cmp(&b.object.name.to_lowercase()));
+                list.sort_by_key(|o| o.object.name.to_lowercase());
                 let mut st = CollapsingState::load_with_default_open(
                     ui.ctx(),
                     egui::Id::new(("folder", ds, &key, kind)),
@@ -865,7 +865,7 @@ fn table_details_ui(ui: &mut egui::Ui, ds: Uuid, t: &TableInfo, palette: &Palett
         .map(|i| format!("{} {} ({}){}", if i.unique { "◈" } else { "▸" }, i.name, i.columns.join(", "), i.method.as_ref().map(|m| format!(" {m}")).unwrap_or_default()))
         .collect();
     simple_folder(ui, ("idx", ds, &t.object), "indexes", &idx);
-    let checks: Vec<String> = t.checks.iter().map(|c| format!("✓ {} {}", c.name.clone().unwrap_or_default(), c.expression)).collect();
+    let checks: Vec<String> = t.checks.iter().map(|c| format!("✔ {} {}", c.name.clone().unwrap_or_default(), c.expression)).collect();
     simple_folder(ui, ("checks", ds, &t.object), "checks", &checks);
     let trg: Vec<String> = t.triggers.iter().map(|tr| format!("⚡ {} {} {}", tr.name, tr.timing, tr.events)).collect();
     simple_folder(ui, ("trg", ds, &t.object), "triggers", &trg);
@@ -927,15 +927,10 @@ pub async fn load_catalog(source_conn: std::sync::Arc<crate::runtime::SharedConn
     }
     // Columns for the default schema's tables (bounded) so completion works immediately.
     let default = cat.default_schema.clone();
-    let mut described = 0;
-    for t in cat.tables.iter_mut().filter(|t| t.schema == default || default.is_none()) {
-        if described >= 200 {
-            break;
-        }
+    for t in cat.tables.iter_mut().filter(|t| t.schema == default || default.is_none()).take(200) {
         if let Ok(info) = c.describe_table(&ObjectRef::new(t.schema.as_deref(), t.name.clone(), t.kind)).await {
             t.columns = info.columns.into_iter().map(|c| CatalogColumn { name: c.name, data_type: c.data_type }).collect();
         }
-        described += 1;
     }
     Ok(cat)
 }
@@ -944,8 +939,8 @@ pub fn driver_icon(kind: DriverKind) -> &'static str {
     match kind {
         DriverKind::Postgres | DriverKind::CockroachDb | DriverKind::Redshift => "🐘",
         DriverKind::MySql | DriverKind::MariaDb | DriverKind::TiDb => "🐬",
-        DriverKind::Sqlite => "🪶",
-        DriverKind::MsSql => "🗔",
+        DriverKind::Sqlite => "💾",
+        DriverKind::MsSql => "🖥",
     }
 }
 

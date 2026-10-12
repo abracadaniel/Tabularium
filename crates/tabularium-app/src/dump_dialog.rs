@@ -11,6 +11,9 @@ use crate::ctx::{Ctx, Dialog, NoticeLevel};
 use crate::runtime::{poll_slot, Pending};
 use crate::theme::Palette;
 
+/// Program, arguments and extra environment variables.
+type ToolCommand = (PathBuf, Vec<String>, Vec<(String, String)>);
+
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum Mode {
     Dump,
@@ -63,7 +66,7 @@ impl DumpDialog {
     }
 
     /// Program, arguments and environment for the external tool.
-    fn command(&self, cfg: &ConnectionConfig) -> Result<(PathBuf, Vec<String>, Vec<(String, String)>), String> {
+    fn command(&self, cfg: &ConnectionConfig) -> Result<ToolCommand, String> {
         let mut env = vec![];
         let path = self.path.trim().to_string();
         match cfg.driver.dialect() {

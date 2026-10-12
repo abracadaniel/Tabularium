@@ -13,6 +13,7 @@ enum Page {
     Options,
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum DialogResult {
     Open,
     Cancel,

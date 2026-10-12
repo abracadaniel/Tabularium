@@ -276,7 +276,7 @@ impl TableDesignerTab {
                     if ui.add(egui::TextEdit::singleline(&mut cm).desired_width(160.0)).changed() {
                         r.col.comment = if cm.trim().is_empty() { None } else { Some(cm) };
                     }
-                    if ui.small_button("✕").on_hover_text("Remove column").clicked() {
+                    if ui.small_button("×").on_hover_text("Remove column").clicked() {
                         remove = Some(i);
                     }
                     ui.end_row();
@@ -289,7 +289,7 @@ impl TableDesignerTab {
         if let Some(i) = remove {
             self.columns.remove(i);
         }
-        if ui.button("＋ Add column").clicked() {
+        if ui.button("+ Add column").clicked() {
             let n = self.columns.len() + 1;
             self.columns.push(ColumnRow {
                 original: None,
@@ -310,7 +310,7 @@ impl TableDesignerTab {
                 ui.add(egui::TextEdit::singleline(name).desired_width(180.0));
                 ui.add(egui::TextEdit::singleline(cols).desired_width(260.0));
                 ui.checkbox(unique, "");
-                if ui.small_button("✕").clicked() {
+                if ui.small_button("×").clicked() {
                     remove = Some(i);
                 }
                 ui.end_row();
@@ -319,7 +319,7 @@ impl TableDesignerTab {
         if let Some(i) = remove {
             self.indexes.remove(i);
         }
-        if ui.button("＋ Add index").clicked() {
+        if ui.button("+ Add index").clicked() {
             let first = self.columns.first().map(|c| c.col.name.clone()).unwrap_or_default();
             self.indexes.push((format!("{}_{}_idx", self.name, first), first, false));
         }
@@ -356,7 +356,7 @@ impl TableDesignerTab {
                         }
                     });
                 }
-                if ui.small_button("✕").clicked() {
+                if ui.small_button("×").clicked() {
                     remove = Some(i);
                 }
                 ui.end_row();
@@ -366,7 +366,7 @@ impl TableDesignerTab {
             self.fks.remove(i);
             self.fk_columns_text.remove(i);
         }
-        if ui.button("＋ Add foreign key").clicked() {
+        if ui.button("+ Add foreign key").clicked() {
             self.fks.push(ForeignKeyInfo { name: Some(format!("{}_fk_{}", self.name, self.fks.len() + 1)), ..Default::default() });
             self.fk_columns_text.push((String::new(), "id".into()));
         }
@@ -385,7 +385,7 @@ impl TableDesignerTab {
                     c.name = if name.is_empty() { None } else { Some(name) };
                 }
                 ui.add(egui::TextEdit::singleline(&mut c.expression).desired_width(360.0).font(egui::TextStyle::Monospace));
-                if ui.small_button("✕").clicked() {
+                if ui.small_button("×").clicked() {
                     remove = Some(i);
                 }
                 ui.end_row();
@@ -394,7 +394,7 @@ impl TableDesignerTab {
         if let Some(i) = remove {
             self.checks.remove(i);
         }
-        if ui.button("＋ Add check").clicked() {
+        if ui.button("+ Add check").clicked() {
             self.checks.push(CheckInfo { name: None, expression: String::new() });
         }
     }
