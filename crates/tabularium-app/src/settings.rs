@@ -39,6 +39,8 @@ pub struct Settings {
     /// Text shown for NULL cells.
     pub null_text: String,
     pub record_history: bool,
+    /// Keep saved passwords in the OS keychain instead of connections.json.
+    pub use_keychain: bool,
     pub restore_consoles: bool,
     pub recent_files: Vec<String>,
     /// Max characters shown in a grid cell before truncating.
@@ -63,6 +65,7 @@ impl Default for Settings {
             confirm_dangerous_statements: true,
             null_text: "<null>".into(),
             record_history: true,
+            use_keychain: true,
             restore_consoles: true,
             recent_files: vec![],
             max_cell_chars: 200,

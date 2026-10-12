@@ -38,6 +38,7 @@ enum ResultView {
         sql: String,
     },
     Plan { text: String, summary: String },
+    PlanTree { plan: Box<crate::plan::Plan>, raw: String, summary: String, show_raw: bool },
     Message { text: String, error: bool },
 }
 
@@ -237,6 +238,7 @@ impl ConsoleTab {
         self.editor.error_range = None;
         self.run_started = Some(Instant::now());
         let count = statements.len();
+        let dialect = self.editor.dialect;
         ctx.rt.spawn(async move {
             let conn = match session.get().await {
                 Ok(c) => c,
@@ -251,6 +253,12 @@ impl ConsoleTab {
                 let _ = tx.send(ExecEvent::Started(index));
                 egui_ctx.request_repaint();
                 let result = match explain {
+                    // Postgres: JSON plans feed the visual plan tree.
+                    Some(analyze) if dialect == tabularium_core::Dialect::Postgres => {
+                        let opts = if analyze { "FORMAT JSON, VERBOSE, ANALYZE, BUFFERS" } else { "FORMAT JSON, VERBOSE" };
+                        let stmt = format!("EXPLAIN ({opts}) {}", sql.trim().trim_end_matches(';'));
+                        conn.execute(&stmt, &ExecOptions::unlimited()).await
+                    }
                     Some(analyze) => conn.explain(&sql, analyze).await,
                     None => conn.execute(&sql, &ExecOptions::with_limit(max_rows)).await,
                 };
@@ -329,7 +337,22 @@ impl ConsoleTab {
                     self.nav_loaded = false;
                 }
                 let is_plan = first == "EXPLAIN" || res.columns.len() == 1 && res.columns[0].name.eq_ignore_ascii_case("QUERY PLAN");
-                if res.has_result_set() && is_plan {
+                let json_plan = (res.has_result_set() && is_plan && res.rows.len() == 1)
+                    .then(|| res.rows[0][0].display_text().unwrap_or_default())
+                    .and_then(|raw| crate::plan::Plan::parse(&raw).map(|p| (p, raw)));
+                if let Some((plan, raw)) = json_plan {
+                    let n = self.results.len() + 1;
+                    let raw = serde_json::from_str::<serde_json::Value>(&raw)
+                        .ok()
+                        .and_then(|v| serde_json::to_string_pretty(&v).ok())
+                        .unwrap_or(raw);
+                    self.results.push(ResultTab {
+                        title: format!("Plan {n}"),
+                        view: ResultView::PlanTree { plan: Box::new(plan), raw, summary, show_raw: false },
+                        pinned: false,
+                    });
+                    self.active_result = self.results.len() - 1;
+                } else if res.has_result_set() && is_plan {
                     let text = plan_text(&res);
                     let n = self.results.len() + 1;
                     self.results.push(ResultTab { title: format!("Plan {n}"), view: ResultView::Plan { text, summary }, pinned: false });
@@ -817,6 +840,20 @@ impl ConsoleTab {
                 ui.weak(summary.as_str());
                 egui::ScrollArea::both().auto_shrink([false, false]).show(ui, |ui| {
                     plan_ui(ui, text, &palette);
+                });
+            }
+            ResultView::PlanTree { plan, raw, summary, show_raw } => {
+                ui.horizontal(|ui| {
+                    ui.weak(summary.as_str());
+                    ui.checkbox(show_raw, "Raw JSON");
+                });
+                egui::ScrollArea::both().auto_shrink([false, false]).show(ui, |ui| {
+                    if *show_raw {
+                        let mut t = raw.as_str();
+                        ui.add(egui::TextEdit::multiline(&mut t).code_editor().desired_width(f32::INFINITY));
+                    } else {
+                        plan.ui(ui, &palette);
+                    }
                 });
             }
             ResultView::Message { text, error } => {

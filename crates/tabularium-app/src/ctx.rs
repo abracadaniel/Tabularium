@@ -103,6 +103,7 @@ pub enum AppAction {
     Export(ExportSource),
     Import { ds: Uuid, schema: Option<String>, table: Option<ObjectRef> },
     CopyTable { ds: Uuid, object: ObjectRef },
+    Dump { ds: Uuid, restore: bool },
     RecordHistory(HistoryEntry),
     ClearHistory,
     /// Re-read objects of a data source for completion.

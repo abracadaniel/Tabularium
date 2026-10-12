@@ -9,7 +9,9 @@ license.workspace = true
 default = ["postgres", "mysql", "sqlite", "mssql", "ssh"]
 postgres = ["sqlx/postgres"]
 mysql = ["sqlx/mysql"]
-sqlite = ["sqlx/sqlite"]
+# `sqlx/sqlite` bundles SQLite (compiled from source via libsqlite3-sys "bundled"),
+# so no system library is needed on any platform.
+sqlite = ["sqlx/sqlite", "dep:libsqlite3-sys"]
 mssql = ["dep:tiberius", "dep:tokio-util"]
 ssh = ["dep:russh"]
 
@@ -24,10 +26,14 @@ tokio.workspace = true
 futures.workspace = true
 log.workspace = true
 hex.workspace = true
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-webpki", "chrono", "uuid", "json", "rust_decimal", "bigdecimal", "ipnetwork", "mac_address", "bit-vec"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-webpki", "chrono", "uuid", "json"] }
+# Same version sqlx-sqlite links against; used only for `sqlite3_interrupt` (query cancel).
+libsqlite3-sys = { version = "0.30", optional = true, default-features = false }
 tiberius = { version = "0.12", optional = true, default-features = false, features = ["tds73", "rustls", "chrono", "rust_decimal"] }
 tokio-util = { version = "0.7", optional = true, features = ["compat"] }
-russh = { version = "0.54", optional = true }
+# `ring` crypto backend instead of the default aws-lc-rs: pure Rust + bundled C/asm that
+# builds on macOS, Linux and Windows without cmake/NASM.
+russh = { version = "0.54", optional = true, default-features = false, features = ["ring", "flate2", "rsa"] }
 
 [dev-dependencies]
 tempfile.workspace = true

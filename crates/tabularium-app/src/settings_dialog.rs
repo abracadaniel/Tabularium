@@ -84,6 +84,7 @@ impl SettingsDialog {
                 ui.vertical(|ui| {
                     ui.checkbox(&mut d.confirm_dangerous_statements, "Confirm UPDATE/DELETE without WHERE");
                     ui.checkbox(&mut d.record_history, "Record query history");
+                    ui.checkbox(&mut d.use_keychain, "Store saved passwords in the OS keychain");
                 });
                 ui.end_row();
             });

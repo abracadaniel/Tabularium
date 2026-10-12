@@ -120,6 +120,7 @@ impl TabulariumApp {
             show_about: false,
             exiting: false,
         };
+        app.load_keychain_passwords(&cc.egui_ctx);
         if app.settings.restore_consoles {
             app.restore_consoles();
         }
@@ -158,8 +159,44 @@ impl TabulariumApp {
 
     fn save_store(&mut self) {
         self.store.connections = self.sources.list.iter().map(|d| d.config.clone()).collect();
+        for c in &mut self.store.connections {
+            let pw = c.password.clone().unwrap_or_default();
+            if !c.save_password || pw.is_empty() {
+                if !c.save_password {
+                    crate::secrets::delete(c.id);
+                }
+                continue;
+            }
+            // Keep the secret out of the JSON file when the keychain accepts it.
+            if self.settings.use_keychain && crate::secrets::store(c.id, &pw) {
+                c.password = None;
+            }
+        }
         if let Err(e) = self.store.save(&self.dirs.connections_file()) {
             self.notify(NoticeLevel::Error, format!("Saving data sources: {e}"));
+        }
+    }
+
+    /// Fetch saved passwords from the keychain in the background (keychain calls may block
+    /// or show an OS prompt).
+    fn load_keychain_passwords(&mut self, ctx: &egui::Context) {
+        if !self.settings.use_keychain {
+            return;
+        }
+        for ds in &self.sources.list {
+            let c = &ds.config;
+            if !c.save_password || c.driver.is_file_based() || c.password.as_deref().is_some_and(|p| !p.is_empty()) {
+                continue;
+            }
+            let id = c.id;
+            let conn = ds.conn.clone();
+            let egui_ctx = ctx.clone();
+            self.rt.spawn_blocking(move || {
+                if let Some(pw) = crate::secrets::load(id) {
+                    conn.set_session_password(Some(pw));
+                    egui_ctx.request_repaint();
+                }
+            });
         }
     }
 
@@ -305,6 +342,7 @@ impl TabulariumApp {
             AppAction::DeleteDataSource(id) => {
                 if let Some(idx) = self.sources.list.iter().position(|d| d.config.id == id) {
                     let ds = self.sources.list.remove(idx);
+                    crate::secrets::delete(ds.config.id);
                     let conn = ds.conn.clone();
                     self.rt.spawn(async move { conn.disconnect().await });
                     self.explorer.refresh(id);
@@ -394,6 +432,10 @@ impl TabulariumApp {
             }
             AppAction::CopyTable { ds, object } => {
                 self.dialogs.push(Box::new(crate::copy_table::CopyTableDialog::new(ds, object)));
+            }
+            AppAction::Dump { ds, restore } => {
+                let mode = if restore { crate::dump_dialog::Mode::Restore } else { crate::dump_dialog::Mode::Dump };
+                self.dialogs.push(Box::new(crate::dump_dialog::DumpDialog::new(ds, mode)));
             }
             AppAction::RecordHistory(entry) => {
                 if let Err(e) = self.history.add(entry) {
@@ -668,6 +710,15 @@ impl TabulariumApp {
                     }
                     if ui.button("New table…").clicked() {
                         self.actions.push(AppAction::OpenModifyTable { ds, object: None, schema: None });
+                        ui.close();
+                    }
+                    ui.separator();
+                    if ui.button("Dump database…").clicked() {
+                        self.actions.push(AppAction::Dump { ds, restore: false });
+                        ui.close();
+                    }
+                    if ui.button("Restore from dump…").clicked() {
+                        self.actions.push(AppAction::Dump { ds, restore: true });
                         ui.close();
                     }
                 });

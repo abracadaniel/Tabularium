@@ -408,6 +408,14 @@ impl Explorer {
             ctx.act(AppAction::OpenFindInDb { ds: id, schema: None });
             ui.close();
         }
+        if ui.button("Dump database…").clicked() {
+            ctx.act(AppAction::Dump { ds: id, restore: false });
+            ui.close();
+        }
+        if ui.button("Restore from dump…").clicked() {
+            ctx.act(AppAction::Dump { ds: id, restore: true });
+            ui.close();
+        }
         ui.separator();
         if ui.button("Delete data source").clicked() {
             let name = ctx.sources.name(id);
