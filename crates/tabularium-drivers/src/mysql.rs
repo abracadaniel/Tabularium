@@ -528,7 +528,7 @@ impl MySqlConnection {
                 nullable: c_string(r, 2).eq_ignore_ascii_case("YES"),
                 default,
                 auto_increment: extra_l.contains("auto_increment"),
-                generated: if is_generated { gen_expr } else { None },
+                generated: if is_generated { gen_expr.map(|g| strip_outer_parens(&g).to_string()) } else { None },
                 comment: c_nonempty(r, 5),
                 collation: c_str(r, 6).filter(|c| Some(c) != table_collation.as_ref()),
                 ordinal: c_i64(r, 7).unwrap_or(0) as u32,
@@ -630,7 +630,7 @@ impl MySqlConnection {
                 .await
             };
             for r in checks.unwrap_or_default() {
-                info.checks.push(CheckInfo { name: c_str(&r, 0), expression: c_string(&r, 1) });
+                info.checks.push(CheckInfo { name: c_str(&r, 0), expression: strip_outer_parens(&c_string(&r, 1)).to_string() });
             }
 
             // Triggers
@@ -1105,6 +1105,35 @@ impl Connection for MySqlConnection {
     }
 }
 
+/// Remove one pair of parentheses enclosing a whole expression. MySQL 8 reports generation
+/// and check expressions as `(expr)` while MariaDB reports `expr`; normalising keeps schema
+/// comparisons between them stable. `(a) + (b)` is left untouched.
+fn strip_outer_parens(expr: &str) -> &str {
+    let t = expr.trim();
+    if !(t.starts_with('(') && t.ends_with(')')) {
+        return t;
+    }
+    let mut depth = 0i32;
+    let mut quote: Option<char> = None;
+    for (i, ch) in t.char_indices() {
+        match (quote, ch) {
+            (Some(q), c) if c == q => quote = None,
+            (Some(_), _) => {}
+            (None, '\'' | '"' | '`') => quote = Some(ch),
+            (None, '(') => depth += 1,
+            (None, ')') => {
+                depth -= 1;
+                // The opening paren closed before the end: it doesn't wrap everything.
+                if depth == 0 && i != t.len() - 1 {
+                    return t;
+                }
+            }
+            _ => {}
+        }
+    }
+    t[1..t.len() - 1].trim()
+}
+
 /// Whether `information_schema.COLUMNS.EXTRA` (lower-cased) describes a generated column.
 /// MySQL 8 marks columns with expression defaults (e.g. `DEFAULT CURRENT_TIMESTAMP`) as
 /// `DEFAULT_GENERATED`; those are ordinary columns with a default.
@@ -1119,6 +1148,15 @@ fn is_generated_column(extra_l: &str, has_expression: bool) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn outer_parens() {
+        assert_eq!(strip_outer_parens("(`qty` * 2)"), "`qty` * 2");
+        assert_eq!(strip_outer_parens("qty * 2"), "qty * 2");
+        assert_eq!(strip_outer_parens("(a) + (b)"), "(a) + (b)");
+        assert_eq!(strip_outer_parens("((a + b))"), "(a + b)");
+        assert_eq!(strip_outer_parens("(`total` >= ')')"), "`total` >= ')'");
+    }
 
     #[test]
     fn generated_column_detection() {
