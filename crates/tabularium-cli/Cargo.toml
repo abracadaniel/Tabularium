@@ -1,0 +1,20 @@
+[package]
+name = "tabularium-cli"
+description = "Command line interface for Tabularium"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "tabularium-cli"
+path = "src/main.rs"
+
+[dependencies]
+tabularium-core.workspace = true
+tabularium-drivers.workspace = true
+tabularium-sql.workspace = true
+tabularium-tools.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+tokio.workspace = true
+serde_json.workspace = true

@@ -1,0 +1,12 @@
+[package]
+name = "tabularium-sql"
+description = "SQL tooling for Tabularium: lexer, statement splitter, formatter, completion, inspections"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tabularium-core.workspace = true
+sqlparser.workspace = true
+regex.workspace = true
+serde.workspace = true

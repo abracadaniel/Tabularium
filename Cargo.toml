@@ -1,0 +1,55 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/tabularium-core",
+    "crates/tabularium-drivers",
+    "crates/tabularium-sql",
+    "crates/tabularium-tools",
+    "crates/tabularium-cli",
+    "crates/tabularium-app",
+]
+default-members = ["crates/tabularium-app", "crates/tabularium-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/abracadaniel/Tabularium"
+rust-version = "1.85"
+
+[workspace.dependencies]
+tabularium-core = { path = "crates/tabularium-core" }
+tabularium-drivers = { path = "crates/tabularium-drivers" }
+tabularium-sql = { path = "crates/tabularium-sql" }
+tabularium-tools = { path = "crates/tabularium-tools" }
+
+anyhow = "1"
+thiserror = "2"
+async-trait = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util", "fs", "process"] }
+futures = "0.3"
+directories = "6"
+log = "0.4"
+env_logger = "0.11"
+regex = "1"
+base64 = "0.22"
+hex = "0.4"
+csv = "1"
+sqlparser = "0.59"
+clap = { version = "4", features = ["derive"] }
+tempfile = "3"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
+strip = true

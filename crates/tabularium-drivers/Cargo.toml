@@ -1,0 +1,34 @@
+[package]
+name = "tabularium-drivers"
+description = "Database drivers for Tabularium (PostgreSQL, MySQL/MariaDB, SQLite, SQL Server) plus SSH tunnelling"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = ["postgres", "mysql", "sqlite", "mssql", "ssh"]
+postgres = ["sqlx/postgres"]
+mysql = ["sqlx/mysql"]
+sqlite = ["sqlx/sqlite"]
+mssql = ["dep:tiberius", "dep:tokio-util"]
+ssh = ["dep:russh"]
+
+[dependencies]
+tabularium-core.workspace = true
+anyhow.workspace = true
+async-trait.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+tokio.workspace = true
+futures.workspace = true
+log.workspace = true
+hex.workspace = true
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-webpki", "chrono", "uuid", "json", "rust_decimal", "bigdecimal", "ipnetwork", "mac_address", "bit-vec"] }
+tiberius = { version = "0.12", optional = true, default-features = false, features = ["tds73", "rustls", "chrono", "rust_decimal"] }
+tokio-util = { version = "0.7", optional = true, features = ["compat"] }
+russh = { version = "0.54", optional = true }
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { workspace = true, features = ["test-util"] }

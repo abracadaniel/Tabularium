@@ -1,0 +1,22 @@
+[package]
+name = "tabularium-tools"
+description = "Data tooling for Tabularium: DDL generation, schema diff, export/import, data change scripts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tabularium-core.workspace = true
+tabularium-sql.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+csv.workspace = true
+base64.workspace = true
+hex.workspace = true
+rust_xlsxwriter = "0.92"
+calamine = "0.31"
+
+[dev-dependencies]
+tempfile.workspace = true

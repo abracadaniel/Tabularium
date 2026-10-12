@@ -1,0 +1,28 @@
+[package]
+name = "tabularium-app"
+description = "Tabularium: a cross-platform database IDE"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "tabularium"
+path = "src/main.rs"
+
+[dependencies]
+tabularium-core.workspace = true
+tabularium-drivers.workspace = true
+tabularium-sql.workspace = true
+tabularium-tools.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+tokio.workspace = true
+log.workspace = true
+env_logger.workspace = true
+eframe = { version = "0.33", default-features = false, features = ["default_fonts", "glow", "persistence", "wayland", "x11"] }
+egui_extras = { version = "0.33", features = ["syntect"] }
+rfd = "0.15"
+arboard = "3"
