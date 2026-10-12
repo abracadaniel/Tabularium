@@ -17,8 +17,12 @@ cargo run --release -p tabularium-cli -- --help
 | MySQL, MariaDB, TiDB              | sqlx (pure Rust, rustls)   | `information_schema` + `SHOW CREATE`    |
 | SQLite                            | sqlx, bundled libsqlite3   | file or `:memory:`                      |
 | Microsoft SQL Server              | tiberius (pure Rust)       | `sys.*` catalog                         |
+| ClickHouse                        | HTTP(S) via reqwest/rustls | `system.*` tables, no transactions      |
+| DuckDB                            | duckdb-rs, bundled engine  | opt-in: `cargo build --features duckdb` |
 
-All drivers are compiled in by default and need no client libraries. SSH tunnels
+All drivers except DuckDB are compiled in by default and need no client libraries.
+DuckDB is opt-in because its bundled C++ engine takes several minutes to compile
+(it still needs only a C++ compiler, no system library). SSH tunnels
 (password, key file, ssh-agent) and SSL/TLS modes are supported for every
 network database.
 
@@ -145,14 +149,17 @@ Driver integration tests run against real servers when these are set:
 ```
 TABULARIUM_TEST_PG_URL=postgres://postgres@localhost:5432/postgres
 TABULARIUM_TEST_MYSQL_URL=mysql://root:root@127.0.0.1:3306/tabularium
+TABULARIUM_TEST_CLICKHOUSE_URL=clickhouse://default@127.0.0.1:8123/default
 ```
+
+The DuckDB tests need no server: `cargo test -p tabularium-drivers --features duckdb`.
 
 ## Project layout
 
 | Crate                | Purpose                                                          |
 |----------------------|------------------------------------------------------------------|
 | `tabularium-core`    | data model, `Connection` driver trait, values, dialects, config  |
-| `tabularium-drivers` | PostgreSQL, MySQL, SQLite, SQL Server drivers and SSH tunnels    |
+| `tabularium-drivers` | PostgreSQL, MySQL, SQLite, SQL Server, ClickHouse, DuckDB drivers and SSH tunnels |
 | `tabularium-sql`     | lexer, splitter, formatter, completion, inspections, templates   |
 | `tabularium-tools`   | DDL, schema diff, export/import, change scripts, history, datagen|
 | `tabularium-app`     | the desktop application                                          |
@@ -164,7 +171,7 @@ Tabularium covers DataGrip's core workflow (data sources, explorer, consoles,
 editing, schema tools, import/export). Not implemented yet:
 
 - Databases without a pure-Rust driver (Oracle, DB2, Snowflake, BigQuery,
-  MongoDB, Redis, Cassandra, ClickHouse, DuckDB, …)
+  MongoDB, Redis, Cassandra, …)
 - OS keychain password storage
 - Graphical (tree/diagram) query plans — plans are shown as highlighted text
 - Code refactorings (rename across scripts), find usages, VCS integration,

@@ -35,8 +35,8 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
-  postgres:
-    name: PostgreSQL integration
+  integration:
+    name: Database integration
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -44,7 +44,7 @@ jobs:
         env:
           POSTGRES_PASSWORD: postgres
         ports: ["5432:5432"]
-        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
       mysql:
         image: mysql:8.4
         env:
@@ -52,15 +52,36 @@ jobs:
           MYSQL_DATABASE: tabularium
         ports: ["3306:3306"]
         options: --health-cmd "mysqladmin ping -proot" --health-interval 5s --health-timeout 5s --health-retries 20
+      clickhouse:
+        image: clickhouse/clickhouse-server:25.8
+        env:
+          CLICKHOUSE_SKIP_USER_SETUP: "1"
+        ports: ["8123:8123"]
+        options: --health-cmd "clickhouse-client --query 'SELECT 1'" --health-interval 5s --health-timeout 5s --health-retries 20
     env:
       TABULARIUM_TEST_PG_URL: postgres://postgres:postgres@localhost:5432/postgres
       TABULARIUM_TEST_MYSQL_URL: mysql://root:root@127.0.0.1:3306/tabularium
+      TABULARIUM_TEST_CLICKHOUSE_URL: clickhouse://default@127.0.0.1:8123/default
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Driver integration tests
         run: cargo test -p tabularium-drivers -p tabularium-cli --locked
+
+  duckdb:
+    name: DuckDB (opt-in feature)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: DuckDB driver tests
+        run: cargo test -p tabularium-drivers --features duckdb --test duckdb --locked
+      - name: Clippy with DuckDB
+        run: cargo clippy -p tabularium-drivers --features duckdb --all-targets --locked -- -D warnings
 
   release:
     name: Release build (${{ matrix.target }})

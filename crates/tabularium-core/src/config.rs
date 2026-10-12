@@ -20,10 +20,14 @@ pub enum DriverKind {
     CockroachDb,
     Redshift,
     TiDb,
+    /// ClickHouse over its HTTP interface.
+    ClickHouse,
+    /// Embedded DuckDB database file.
+    DuckDb,
 }
 
 impl DriverKind {
-    pub const ALL: [DriverKind; 8] = [
+    pub const ALL: [DriverKind; 10] = [
         DriverKind::Postgres,
         DriverKind::MySql,
         DriverKind::MariaDb,
@@ -32,6 +36,8 @@ impl DriverKind {
         DriverKind::CockroachDb,
         DriverKind::Redshift,
         DriverKind::TiDb,
+        DriverKind::ClickHouse,
+        DriverKind::DuckDb,
     ];
 
     pub fn label(self) -> &'static str {
@@ -44,15 +50,21 @@ impl DriverKind {
             DriverKind::CockroachDb => "CockroachDB",
             DriverKind::Redshift => "Amazon Redshift",
             DriverKind::TiDb => "TiDB",
+            DriverKind::ClickHouse => "ClickHouse",
+            DriverKind::DuckDb => "DuckDB",
         }
     }
 
     pub fn dialect(self) -> Dialect {
         match self {
-            DriverKind::Postgres | DriverKind::CockroachDb | DriverKind::Redshift => Dialect::Postgres,
+            DriverKind::Postgres | DriverKind::CockroachDb | DriverKind::Redshift | DriverKind::DuckDb => {
+                Dialect::Postgres
+            }
             DriverKind::MySql | DriverKind::MariaDb | DriverKind::TiDb => Dialect::MySql,
             DriverKind::Sqlite => Dialect::Sqlite,
             DriverKind::MsSql => Dialect::MsSql,
+            // Double-quoted identifiers, `'` strings, LIMIT/OFFSET, TRUE/FALSE: generic SQL fits.
+            DriverKind::ClickHouse => Dialect::Generic,
         }
     }
 
@@ -64,7 +76,8 @@ impl DriverKind {
             DriverKind::MySql | DriverKind::MariaDb => 3306,
             DriverKind::TiDb => 4000,
             DriverKind::MsSql => 1433,
-            DriverKind::Sqlite => 0,
+            DriverKind::ClickHouse => 8123,
+            DriverKind::Sqlite | DriverKind::DuckDb => 0,
         }
     }
 
@@ -74,13 +87,14 @@ impl DriverKind {
             DriverKind::CockroachDb => "root",
             DriverKind::MySql | DriverKind::MariaDb | DriverKind::TiDb => "root",
             DriverKind::MsSql => "sa",
-            DriverKind::Sqlite => "",
+            DriverKind::ClickHouse => "default",
+            DriverKind::Sqlite | DriverKind::DuckDb => "",
         }
     }
 
     /// File-based databases have no host/port/user.
     pub fn is_file_based(self) -> bool {
-        matches!(self, DriverKind::Sqlite)
+        matches!(self, DriverKind::Sqlite | DriverKind::DuckDb)
     }
 
     pub fn url_scheme(self) -> &'static str {
@@ -89,6 +103,8 @@ impl DriverKind {
             DriverKind::MySql | DriverKind::MariaDb | DriverKind::TiDb => "mysql",
             DriverKind::Sqlite => "sqlite",
             DriverKind::MsSql => "mssql",
+            DriverKind::ClickHouse => "clickhouse",
+            DriverKind::DuckDb => "duckdb",
         }
     }
 }
@@ -241,8 +257,19 @@ impl ConnectionConfig {
         self.driver.dialect()
     }
 
+    /// Convenience constructor for DuckDB files (or `:memory:`).
+    pub fn duckdb(path: impl Into<String>) -> Self {
+        let mut c = Self::sqlite(path);
+        c.driver = DriverKind::DuckDb;
+        if c.database.is_empty() {
+            c.name = DriverKind::DuckDb.label().to_string();
+        }
+        c
+    }
+
     /// Parse a URL such as `postgres://user:pw@host:5432/db?sslmode=require`,
-    /// `mysql://...`, `sqlite:///path/to.db`, `mssql://...`.
+    /// `mysql://...`, `sqlite:///path/to.db`, `mssql://...`, `clickhouse://...`
+    /// (`clickhouses://` = HTTPS), `duckdb:///path/to.duckdb`.
     pub fn from_url(url: &str) -> Result<Self> {
         let (scheme, rest) =
             url.split_once("://").ok_or_else(|| Error::Config(format!("invalid URL: {url}")))?;
@@ -255,6 +282,8 @@ impl ConnectionConfig {
             "tidb" => DriverKind::TiDb,
             "sqlite" | "file" => DriverKind::Sqlite,
             "mssql" | "sqlserver" => DriverKind::MsSql,
+            "clickhouse" | "clickhouses" | "ch" => DriverKind::ClickHouse,
+            "duckdb" => DriverKind::DuckDb,
             other => return Err(Error::Config(format!("unsupported URL scheme: {other}"))),
         };
         if driver == DriverKind::Sqlite {
@@ -262,7 +291,15 @@ impl ConnectionConfig {
             // sqlite:///abs/path -> /abs/path ; sqlite://rel.db -> rel.db
             return Ok(Self::sqlite(percent_decode(path)));
         }
+        if driver == DriverKind::DuckDb {
+            let path = rest.split('?').next().unwrap_or(rest);
+            return Ok(Self::duckdb(percent_decode(path)));
+        }
         let mut cfg = Self::new(driver);
+        if scheme.eq_ignore_ascii_case("clickhouses") {
+            cfg.ssl.mode = SslMode::Require;
+            cfg.port = 8443;
+        }
         let (main, query) = match rest.split_once('?') {
             Some((m, q)) => (m, Some(q)),
             None => (rest, None),
@@ -338,7 +375,7 @@ impl ConnectionConfig {
             return url.clone();
         }
         if self.driver.is_file_based() {
-            return format!("sqlite://{}", self.database);
+            return format!("{}://{}", self.driver.url_scheme(), self.database);
         }
         let mut auth = percent_encode(&self.user);
         if with_password {
@@ -520,6 +557,37 @@ mod tests {
         let s = ConnectionConfig::from_url("sqlite:///tmp/x.db").unwrap();
         assert_eq!(s.database, "/tmp/x.db");
         assert_eq!(s.name, "x.db");
+    }
+
+    #[test]
+    fn parse_clickhouse_and_duckdb() {
+        let c = ConnectionConfig::from_url("clickhouse://default:pw@ch.local/analytics?max_threads=4").unwrap();
+        assert_eq!(c.driver, DriverKind::ClickHouse);
+        assert_eq!(c.port, 8123);
+        assert_eq!(c.user, "default");
+        assert_eq!(c.password.as_deref(), Some("pw"));
+        assert_eq!(c.database, "analytics");
+        assert_eq!(c.ssl.mode, SslMode::Prefer);
+        assert_eq!(c.options.get("max_threads").map(String::as_str), Some("4"));
+        assert_eq!(c.dialect(), Dialect::Generic);
+        let s = ConnectionConfig::from_url("clickhouses://u@ch.cloud").unwrap();
+        assert_eq!(s.ssl.mode, SslMode::Require);
+        assert_eq!(s.port, 8443);
+        let s = ConnectionConfig::from_url("clickhouses://u@ch.cloud:9440/db").unwrap();
+        assert_eq!(s.port, 9440);
+        assert_eq!(ConnectionConfig::from_url("clickhouse://localhost").unwrap().user, "default");
+
+        let d = ConnectionConfig::from_url("duckdb:///tmp/warehouse.duckdb").unwrap();
+        assert_eq!(d.driver, DriverKind::DuckDb);
+        assert_eq!(d.database, "/tmp/warehouse.duckdb");
+        assert_eq!(d.name, "warehouse.duckdb");
+        assert!(d.driver.is_file_based());
+        assert_eq!(d.dialect(), Dialect::Postgres);
+        assert_eq!(d.to_url(false), "duckdb:///tmp/warehouse.duckdb");
+        let m = ConnectionConfig::from_url("duckdb://:memory:").unwrap();
+        assert_eq!(m.database, ":memory:");
+        assert_eq!(DriverKind::DuckDb.default_port(), 0);
+        assert_eq!(DriverKind::ClickHouse.url_scheme(), "clickhouse");
     }
 
     #[test]

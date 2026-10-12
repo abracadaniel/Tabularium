@@ -941,6 +941,8 @@ pub fn driver_icon(kind: DriverKind) -> &'static str {
         DriverKind::MySql | DriverKind::MariaDb | DriverKind::TiDb => "🐬",
         DriverKind::Sqlite => "💾",
         DriverKind::MsSql => "🖥",
+        DriverKind::ClickHouse => "⚡",
+        DriverKind::DuckDb => "🗐",
     }
 }
 

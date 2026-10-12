@@ -1,12 +1,12 @@
 [package]
 name = "tabularium-drivers"
-description = "Database drivers for Tabularium (PostgreSQL, MySQL/MariaDB, SQLite, SQL Server) plus SSH tunnelling"
+description = "Database drivers for Tabularium (PostgreSQL, MySQL/MariaDB, SQLite, SQL Server, ClickHouse, DuckDB) plus SSH tunnelling"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [features]
-default = ["postgres", "mysql", "sqlite", "mssql", "ssh"]
+default = ["postgres", "mysql", "sqlite", "mssql", "clickhouse", "ssh"]
 postgres = ["sqlx/postgres"]
 mysql = ["sqlx/mysql"]
 # `sqlx/sqlite` bundles SQLite (compiled from source via libsqlite3-sys "bundled"),
@@ -14,6 +14,11 @@ mysql = ["sqlx/mysql"]
 sqlite = ["sqlx/sqlite", "dep:libsqlite3-sys"]
 mssql = ["dep:tiberius", "dep:tokio-util"]
 ssh = ["dep:russh"]
+# ClickHouse over HTTP(S): reqwest + rustls (ring), no OpenSSL.
+clickhouse = ["dep:reqwest"]
+# Embedded DuckDB. Off by default: `bundled` compiles the DuckDB C++ engine from source
+# (needs only a C++ compiler, no system library), which takes several minutes.
+duckdb = ["dep:duckdb"]
 
 [dependencies]
 tabularium-core.workspace = true
@@ -34,6 +39,11 @@ tokio-util = { version = "0.7", optional = true, features = ["compat"] }
 # `ring` crypto backend instead of the default aws-lc-rs: pure Rust + bundled C/asm that
 # builds on macOS, Linux and Windows without cmake/NASM.
 russh = { version = "0.54", optional = true, default-features = false, features = ["ring", "flate2", "rsa"] }
+# 0.12: its `rustls-tls` feature uses the ring provider (0.13 defaults to aws-lc-rs).
+reqwest = { version = "0.12", optional = true, default-features = false, features = ["rustls-tls", "json"] }
+# `json` and `parquet` are compiled in statically: the extension autoloader would
+# otherwise download them at runtime.
+duckdb = { version = "1", optional = true, features = ["bundled", "json", "parquet"] }
 
 [dev-dependencies]
 tempfile.workspace = true

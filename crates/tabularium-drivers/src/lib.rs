@@ -11,6 +11,8 @@
 //! | MySQL, MariaDB, TiDB             | [`mysql::MySqlConnection`] (sqlx)       |
 //! | SQLite                           | [`sqlite::SqliteConnection`] (sqlx, bundled SQLite) |
 //! | SQL Server                       | [`mssql::MsSqlConnection`] (tiberius)   |
+//! | ClickHouse                       | [`clickhouse::ClickHouseConnection`] (HTTP, reqwest + rustls) |
+//! | DuckDB (feature `duckdb`)        | [`duckdb::DuckDbConnection`] (duckdb-rs, bundled) |
 
 use std::sync::Arc;
 
@@ -37,6 +39,12 @@ pub mod sqlite;
 
 #[cfg(feature = "mssql")]
 pub mod mssql;
+
+#[cfg(feature = "clickhouse")]
+pub mod clickhouse;
+
+#[cfg(feature = "duckdb")]
+pub mod duckdb;
 
 /// Open a new session for the config.
 ///
@@ -83,6 +91,24 @@ pub async fn connect(cfg: &ConnectionConfig) -> Result<Arc<dyn Connection>> {
             #[cfg(not(feature = "mssql"))]
             Err(not_compiled(cfg.driver))
         }
+        DriverKind::ClickHouse => {
+            #[cfg(feature = "clickhouse")]
+            {
+                let c = clickhouse::ClickHouseConnection::connect(cfg).await?;
+                Ok(Arc::new(c))
+            }
+            #[cfg(not(feature = "clickhouse"))]
+            Err(not_compiled(cfg.driver))
+        }
+        DriverKind::DuckDb => {
+            #[cfg(feature = "duckdb")]
+            {
+                let c = duckdb::DuckDbConnection::connect(cfg).await?;
+                Ok(Arc::new(c))
+            }
+            #[cfg(not(feature = "duckdb"))]
+            Err(not_compiled(cfg.driver))
+        }
     }
 }
 
@@ -105,6 +131,8 @@ pub fn supported_drivers() -> Vec<DriverKind> {
             DriverKind::MySql | DriverKind::MariaDb | DriverKind::TiDb => cfg!(feature = "mysql"),
             DriverKind::Sqlite => cfg!(feature = "sqlite"),
             DriverKind::MsSql => cfg!(feature = "mssql"),
+            DriverKind::ClickHouse => cfg!(feature = "clickhouse"),
+            DriverKind::DuckDb => cfg!(feature = "duckdb"),
         })
         .collect()
 }
@@ -147,6 +175,16 @@ fn connect_futures_are_send(cfg: &ConnectionConfig) {
     assert_send(ssh::open_tunnel(&cfg.ssh, "localhost", 1));
     assert_send_sync::<dyn Connection>();
     assert_send_sync::<ssh::SshTunnel>();
+    #[cfg(feature = "clickhouse")]
+    {
+        assert_send(clickhouse::ClickHouseConnection::connect(cfg));
+        assert_send_sync::<clickhouse::ClickHouseConnection>();
+    }
+    #[cfg(feature = "duckdb")]
+    {
+        assert_send(duckdb::DuckDbConnection::connect(cfg));
+        assert_send_sync::<duckdb::DuckDbConnection>();
+    }
 }
 
 #[cfg(test)]
@@ -155,9 +193,11 @@ mod tests {
     use super::*;
 
     #[test]
-    #[cfg(all(feature = "postgres", feature = "mysql", feature = "sqlite", feature = "mssql"))]
+    #[cfg(all(feature = "postgres", feature = "mysql", feature = "sqlite", feature = "mssql", feature = "clickhouse"))]
     fn all_default_drivers_supported() {
         let d = supported_drivers();
-        assert_eq!(d.len(), DriverKind::ALL.len());
+        let expected = DriverKind::ALL.len() - usize::from(!cfg!(feature = "duckdb"));
+        assert_eq!(d.len(), expected);
+        assert_eq!(d.contains(&DriverKind::DuckDb), cfg!(feature = "duckdb"));
     }
 }

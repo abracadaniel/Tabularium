@@ -31,6 +31,8 @@ rfd = "0.15"
 default = ["keychain"]
 # Store saved passwords in the OS keychain instead of connections.json.
 keychain = ["dep:keyring"]
+# Embedded DuckDB driver (compiles the bundled DuckDB C++ engine; slow first build).
+duckdb = ["tabularium-drivers/duckdb"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", optional = true, features = ["apple-native"] }

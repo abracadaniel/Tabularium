@@ -197,19 +197,30 @@ impl ConnectionDialog {
                 ui.horizontal(|ui| {
                     ui.add(egui::TextEdit::singleline(&mut self.cfg.database).hint_text("path/to/database.db or :memory:").desired_width(320.0));
                     if ui.button("…").clicked() {
+                        let (label, exts): (&str, &[&str]) = if self.cfg.driver == DriverKind::DuckDb {
+                            ("DuckDB", &["duckdb", "ddb", "db"])
+                        } else {
+                            ("SQLite", &["db", "sqlite", "sqlite3", "db3"])
+                        };
                         if let Some(p) = rfd::FileDialog::new()
-                            .add_filter("SQLite", &["db", "sqlite", "sqlite3", "db3"])
+                            .add_filter(label, exts)
                             .add_filter("All files", &["*"])
                             .pick_file()
                         {
                             self.cfg.database = p.to_string_lossy().into_owned();
-                            if self.cfg.name == DriverKind::Sqlite.label() {
+                            if self.cfg.name == self.cfg.driver.label() {
                                 self.cfg.name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
                             }
                         }
                     }
                     if ui.button("New…").on_hover_text("Create a new database file").clicked() {
-                        if let Some(p) = rfd::FileDialog::new().add_filter("SQLite", &["db", "sqlite"]).set_file_name("database.db").save_file() {
+                        let (label, ext) =
+                            if self.cfg.driver == DriverKind::DuckDb { ("DuckDB", "duckdb") } else { ("SQLite", "db") };
+                        if let Some(p) = rfd::FileDialog::new()
+                            .add_filter(label, &[ext])
+                            .set_file_name(format!("database.{ext}"))
+                            .save_file()
+                        {
                             self.cfg.database = p.to_string_lossy().into_owned();
                         }
                     }
