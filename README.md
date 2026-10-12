@@ -168,7 +168,8 @@ The DuckDB tests need no server: `cargo test -p tabularium-drivers --features du
 ## Compared with DataGrip
 
 Tabularium covers DataGrip's core workflow (data sources, explorer, consoles,
-editing, schema tools, import/export). Not implemented yet:
+editing, schema tools, import/export). See [ROADMAP.md](ROADMAP.md) for the
+full list of gaps. Not implemented yet:
 
 - Databases without a pure-Rust driver (Oracle, DB2, Snowflake, BigQuery,
   MongoDB, Redis, Cassandra, …)
