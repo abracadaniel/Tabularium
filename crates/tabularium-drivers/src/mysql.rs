@@ -515,8 +515,7 @@ impl MySqlConnection {
             let extra = c_string(r, 4);
             let extra_l = extra.to_ascii_lowercase();
             let gen_expr = c_nonempty(r, 8);
-            let is_generated = extra_l.contains("generated") || extra_l.contains("virtual") || extra_l.contains("persistent")
-                || (extra_l.contains("stored") && gen_expr.is_some());
+            let is_generated = is_generated_column(&extra_l, gen_expr.is_some());
             let data_type = c_string(r, 9).to_ascii_lowercase();
             let default = if is_generated {
                 None
@@ -1106,9 +1105,30 @@ impl Connection for MySqlConnection {
     }
 }
 
+/// Whether `information_schema.COLUMNS.EXTRA` (lower-cased) describes a generated column.
+/// MySQL 8 marks columns with expression defaults (e.g. `DEFAULT CURRENT_TIMESTAMP`) as
+/// `DEFAULT_GENERATED`; those are ordinary columns with a default.
+fn is_generated_column(extra_l: &str, has_expression: bool) -> bool {
+    let extra = extra_l.replace("default_generated", "");
+    extra.contains("generated")
+        || extra.contains("virtual")
+        || extra.contains("persistent")
+        || (extra.contains("stored") && has_expression)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn generated_column_detection() {
+        assert!(!is_generated_column("default_generated", false));
+        assert!(!is_generated_column("default_generated on update current_timestamp", false));
+        assert!(is_generated_column("virtual generated", true));
+        assert!(is_generated_column("stored generated", true));
+        assert!(is_generated_column("persistent", true));
+        assert!(!is_generated_column("auto_increment", false));
+    }
 
     #[test]
     fn defaults() {
